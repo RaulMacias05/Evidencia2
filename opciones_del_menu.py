@@ -4,6 +4,7 @@ import time
 from rich import print
 from rich.table import Table
 from email_validator import validate_email, EmailNotValidError
+import openpyxl
 
 def comprobar_servicio(detalles_totales):
     while True:
@@ -193,7 +194,7 @@ class RegistrarNota:
     
     def aceptacion_de_nota(self, folios):
         while True:
-            aceptar = input('| s - Sí | n - No |\n\n')
+            aceptar = input('¿Desea registrar esta nota?| s - Sí | n - No |\n\n')
             print()
             if aceptar.upper() in ('S', 'SI', 'SÍ'):
                 for i in range(3):
@@ -228,6 +229,8 @@ class ConsultasYReportes:
                 case 2:
                     self.consulta_por_folio()
                 case 3:
+                    self.consulta_por_cliente()
+                case 4:
                     break
 
     def menu_consultas_y_reportes(self):
@@ -238,7 +241,8 @@ class ConsultasYReportes:
 
 1 - Consulta por período
 2 - Consulta por folio
-3 - Regresar al menú principal
+3 - Consulta por cliente
+4 - Regresar al menú principal
               
 ''')
         while True:
@@ -247,7 +251,7 @@ class ConsultasYReportes:
             except ValueError:
                 print('Opción no válida. Intente de nuevo')
             else:
-                if self.eleccion_consulta > 0 and self.eleccion_consulta <= 3:
+                if self.eleccion_consulta > 0 and self.eleccion_consulta <= 4:
                     break
                 else:
                     print('Opción no válida. Intente de nuevo')
@@ -261,11 +265,27 @@ class ConsultasYReportes:
         
         while True:
             try:
-                self.respuesta = input('Ingrese su fecha inicial (dd/mm/aaaa): ')
-                self.fecha_inicial = datetime.datetime.strptime(self.respuesta,"%d/%m/%Y").date()
+                self.respuesta = input('Ingrese su fecha inicial (dd/mm/aaaa) o presione enter para omitir y se le designara la fecha inicial en 01/01/2000:  ')
+                if self.respuesta == "":
+                    self.fecha_inicial = datetime.datetime.strptime("01/01/2000","%d/%m/%Y").date()
+                else:
+                    self.fecha_inicial = datetime.datetime.strptime(self.respuesta,"%d/%m/%Y").date()
         
-                self.respuesta = input('Ingrese su fecha final (dd/mm/aaaa): ')
-                self.fecha_final = datetime.datetime.strptime(self.respuesta,"%d/%m/%Y").date()
+                while True:
+                    self.respuesta = input('Ingrese su fecha final (dd/mm/aaaa) o presione enter para asignar la fecha actual del sistema como fecha final: ')
+                    if self.respuesta == "":
+                        self.fecha_final = datetime.date.today()
+                        break
+                    else:
+                        self.respuesta = datetime.datetime.strptime(self.respuesta,"%d/%m/%Y").date()
+                        if self.respuesta >= self.fecha_inicial:
+                            self.respuesta = datetime.datetime.strftime(self.respuesta,"%d/%m/%Y")
+                            self.fecha_final = datetime.datetime.strptime(self.respuesta,"%d/%m/%Y").date()
+                            break
+                        else:
+                            print ("La fecha final debe ser igual o posterior a la fecha inicial, intentelo de nuevo")
+
+                
             except ValueError:
                 print('Tipo de formato no válido. Intente de nuevo\n')
             except Exception as error:
@@ -278,16 +298,25 @@ class ConsultasYReportes:
         notas_del_periodo.add_column("Datos de la nota", justify="left", style="white")
 
         contador = 0
+        lista_folios =  []
+        suma_montos = 0
         for folio, datos in self.notas_registradas.items():
             fecha = datos[0]
             if fecha >= self.fecha_inicial and fecha <= self.fecha_final:
                 notas_del_periodo.add_row(f'{folio}', f'{fecha}, {datos[1]}, {datos[2]}, {datos[3]}, {datos[4]}')
+                lista_folios.append(folio)
                 contador += 1
                 
         if contador == 0:
+            print (f"Se esta haciendo una consulta por periodo de la fecha {self.fecha_inicial} a  {self.fecha_final}")
             print('\n[red]No existen notas dentro de este período[/red]\n')
         else:
+            print (f"Se esta haciendo una consulta por periodo de la fecha {self.fecha_inicial} a  {self.fecha_final}")
             print(notas_del_periodo)
+            suma_montos = sum([self.notas_registradas[folio][4] for folio in lista_folios])
+            promedio_montos = suma_montos / len(lista_folios)
+            print (f"El promedio de los montos en este periodo es: {promedio_montos}")
+                
         input('Presione Enter para continuar\n')
     
     def consulta_por_folio(self):
@@ -335,6 +364,83 @@ class ConsultasYReportes:
         print(nota_consultada)
 
         input('Presione Enter para continuar\n')
+
+    def consulta_por_cliente(self):
+        os.system('cls')
+        print('[#7AFFFF]--Consulta por Cliente--[/#7AFFFF]\n')
+
+        lista_clientes = []
+        for folio, datos in self.notas_registradas.items():
+            lista_clientes.append([datos[2], folio])
+        lista_clientes.sort()
+
+        for cliente in lista_clientes:
+            print(f'{cliente[1]} - {cliente[0]}')
+
+
+        while True:
+            try:
+                folio_elegido = int(input('\nElija el folio correspondiente al RFC a consultar: '))
+                rfc_elegido = self.notas_registradas[folio_elegido][2]
+                break
+            except ValueError:
+                print('Opción no válida. Intente de nuevo.')
+            except Exception as e:
+                print(f'Ocurrió un error: {e}')
+
+        t_notas_cliente = Table(title="\n[#7AFFFF]--Notas del Cliente--[/#7AFFFF]")
+        t_notas_cliente.add_column("Folio", justify="left", style="#9999FF")
+        t_notas_cliente.add_column("Datos de la nota", justify="left", style="white")
+
+        lista_folios = []
+        suma_montos = 0
+
+        notas_cliente = {}
+        for folio, datos in self.notas_registradas.items():
+            if datos[2] == rfc_elegido:
+                t_notas_cliente.add_row(f'{folio}', f'{datos[0]}, {datos[1]}, {datos[2]}, {datos[3]}, {datos[4]}, {datos[5]}')
+                notas_cliente[folio] = datos
+                lista_folios.append(folio)
+                suma_montos += datos[4]
+
+        print(f"\nNotas para el RFC {rfc_elegido}:\n")
+        print(t_notas_cliente)
+
+        if lista_folios:
+            promedio_montos = suma_montos / len(lista_folios)
+            print(f"\nEl promedio de los montos para este cliente es: {promedio_montos}")
+
+            exportar_excel = input('\n¿Desea exportar esta información a un archivo Excel? (s/n): ')
+            if exportar_excel.lower() == 's':
+                self.exportar_a_excel(rfc_elegido, notas_cliente)
+        else:
+            print(f"\nNo existen notas para el RFC {rfc_elegido}.\n")
+
+        input('Presione Enter para continuar\n')
+
+    def exportar_a_excel(self, rfc, notas_cliente):
+        fecha_emision = datetime.date.today().strftime("%d-%m-%Y")
+        nombre_archivo = f'{rfc}_{fecha_emision}.xlsx'
+
+        libro = openpyxl.Workbook()
+        hoja = libro['Sheet']
+
+        for renglon, folio in enumerate(notas_cliente.keys()):
+            hoja.cell(row=renglon+1, column = 2).value = folio
+
+        for renglon, datos in enumerate(notas_cliente.values()):
+            datos_restantes = ''
+            fecha = str(datos[1])
+            for dato in datos[2:]:
+                datos_restantes += ', ' + str(dato)
+            str_datos = fecha + datos_restantes
+            hoja.cell(row=renglon+1, column = 3).value = str_datos
+            
+        libro.save(nombre_archivo)
+
+        print(f'\nEl archivo Excel ha sido guardado como: {nombre_archivo}\n')
+
+    
 
 class CancelarNota:
     def __init__(self, notas_registradas, notas_canceladas):
@@ -489,3 +595,4 @@ class RecuperarNota:
 
             else:
                 print('Opción no válida. Intente de nuevo\n')
+                

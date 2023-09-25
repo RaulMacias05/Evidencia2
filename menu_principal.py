@@ -1,6 +1,8 @@
 import os
+import csv
 from rich import print
 import time
+import datetime
 import opciones_del_menu as odm
 
 class Menu_principal:
@@ -8,6 +10,8 @@ class Menu_principal:
         self.notas_registradas = {}
         self.notas_canceladas = {}
         self.folios = {}
+
+        self.cargar_estado()
 
         while True:
             self.mostrar_menu()
@@ -75,12 +79,37 @@ class Menu_principal:
     def recuperar_una_nota(self):
         odm.RecuperarNota(self.notas_canceladas, self.notas_registradas)
 
+    def cargar_estado(self):
+        if os.path.exists('estado_app.csv'):
+            with open('estado_app.csv', 'r', newline='') as file:
+                reader = csv.reader(file)
+                for row in reader:
+                    folio, datos_str = row
+                    datos = eval(datos_str)  
+                    folio = int(folio)
+                    self.notas_registradas[folio] = datos
+                    self.folios[folio] = ''
+        else:
+            print('No existen registros previos. Se iniciará con uno nuevo')
+
+    def guardar_estado_csv(self):
+        archivo_csv = 'estado_app.csv'
+
+        with open(archivo_csv, mode='w', newline='') as archivo:
+            writer = csv.writer(archivo)
+
+            for folio, datos in self.notas_registradas.items():
+                writer.writerow((folio, datos))
+
+
+
     def salir_del_sistema(self):
         while True:
-            salir = input("¿Desea salir definitivamente del programa? Al salir las notas se resetearan por completo\n| s - Sí | n - No |\n")
+            salir = input("¿Desea salir definitivamente del programa?\n| s - Sí | n - No |\n")
 
             if salir.upper() in ('S', 'SI', 'SÍ'):
                 print("\nGracias por su visita, vuelva pronto")
+                self.guardar_estado_csv()
                 return True
             
             elif salir.upper() in ('N', 'NO'):
